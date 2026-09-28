@@ -541,11 +541,11 @@ function showMenu() {
       <span class="label">시작 단계</span>
       ${segHtml('start', [[1, '1단계'], [4, '4단계'], [8, '8단계']], startLevel)}
     </div>
+    <button class="main" data-act="start">시작하기</button>
     <div class="legend">
       ${Object.values(SPECIALS).map((s) => `<div>${s.icon} <b style="color:${s.color}">${s.name}</b> ${s.desc}</div>`).join('')}
     </div>
     ${best || t[lang] ? `<span class="tag" style="background:#ffd23f;color:#2b1d52">🏆 ${best ? `${best.toLocaleString()}점` : ''}${best && t[lang] ? ' · ' : ''}${t[lang] ? `${t[lang]}타/분` : ''}</span>` : ''}
-    <button class="main" data-act="start">시작하기</button>
     <div class="help">입력하고 Enter · Esc 일시정지</div>`);
 }
 

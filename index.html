@@ -85,7 +85,18 @@
     backdrop-filter:blur(3px);
     border-radius:22px;
     overflow-y:auto;
+    touch-action:pan-y;
     user-select:none;
+  }
+  /* 세로가 짧은 폰(로비 안 + 아래 입력칸 때문에 판이 더 낮다): 시작 버튼이 가려지지 않게 촘촘하게 */
+  @media (max-height:720px) {
+    #overlay { gap:7px; padding:12px; }
+    #overlay h1 { font-size:36px; }
+    #overlay p, #overlay h1 + .tag { display:none; }   /* 부제는 제목과 같은 말이라 짧은 화면에선 뺀다 */
+    #overlay .label { font-size:12px; }
+    #overlay .seg button { font-size:15px; padding:4px 11px; }
+    #overlay .main { font-size:20px; padding:8px 32px; margin-top:0; }
+    #overlay .legend { font-size:12px; padding:6px 10px; line-height:1.55; }
   }
   #overlay.hidden { display:none; }
   .inked { color:#fff; paint-order:stroke fill; -webkit-text-stroke:6px var(--ink); text-shadow:0 5px 0 var(--ink); }
