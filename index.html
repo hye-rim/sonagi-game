@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
+<title>소나기</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body {
+    width:100%; height:100%; overflow:hidden;
+    background:linear-gradient(180deg, #1b2a44 0%, #0e1628 100%);
+    font-family:-apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    color:#e8f1ff;
+  }
+  #stage {
+    width:100%; height:100%;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:8px;
+  }
+  #hud {
+    display:flex; justify-content:space-between; align-items:flex-end; gap:8px;
+    padding:0 2px 6px; user-select:none;
+    font-variant-numeric:tabular-nums;
+  }
+  #hud .item { display:flex; flex-direction:column; line-height:1.1; }
+  #hud .label { font-size:10px; letter-spacing:.12em; color:#8fb3e8; font-weight:800; }
+  #hud .value { font-size:20px; font-weight:900; }
+  #hp { font-size:13px; letter-spacing:1px; white-space:nowrap; }
+  #hud .icons { display:flex; gap:6px; }
+  #hud button {
+    background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff;
+    width:32px; height:32px; border-radius:8px; font-size:14px; cursor:pointer;
+  }
+  #wrap { position:relative; }
+  #game { display:block; border-radius:10px; box-shadow:0 0 0 2px #2d4570, 0 12px 40px rgba(0,0,0,.5); user-select:none; }
+  #typing-row { display:flex; gap:8px; padding-top:10px; }
+  #typing {
+    flex:1; min-width:0;
+    font-size:20px; font-weight:800; text-align:center;
+    padding:10px 14px; border-radius:12px;
+    background:#f4f8ff; color:#10203a;
+    border:3px solid #5b8fd9; outline:none;
+    font-family:inherit;
+  }
+  #typing:focus { border-color:#8ec5ff; box-shadow:0 0 0 4px rgba(142,197,255,.25); }
+  #typing.wrong { animation:shake .25s; border-color:#ff6b6b; }
+  #typing.right { border-color:#5fd38a; }
+  @keyframes shake { 25% { transform:translateX(-6px); } 75% { transform:translateX(6px); } }
+  #typing-row button {
+    font-size:15px; font-weight:900; padding:0 16px; border-radius:12px; border:none;
+    background:#5b8fd9; color:#fff; cursor:pointer;
+  }
+  #overlay {
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:safe center; gap:10px;
+    text-align:center; padding:20px;
+    background:rgba(10,18,36,.84);
+    border-radius:10px;
+    backdrop-filter:blur(2px);
+    overflow-y:auto;
+    user-select:none;
+  }
+  #overlay.hidden { display:none; }
+  #overlay h1 { font-size:44px; font-weight:900; letter-spacing:.08em;
+    background:linear-gradient(180deg,#ffffff 0%,#9fd2ff 60%,#4d8fe0 100%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    filter:drop-shadow(0 3px 0 #10284d); }
+  #overlay h2 { font-size:28px; font-weight:900; }
+  #overlay p { font-size:14px; color:#c9dcf8; line-height:1.6; }
+  #overlay .help { font-size:12px; color:#8fb3e8; line-height:1.7; }
+  #overlay .label { font-size:11px; letter-spacing:.14em; color:#8fb3e8; font-weight:800; }
+  #overlay .group { display:flex; flex-direction:column; align-items:center; gap:6px; }
+  #overlay .seg { display:flex; background:rgba(255,255,255,.08); border-radius:999px; padding:3px; gap:2px; }
+  #overlay .seg button {
+    background:none; border:none; color:#c9dcf8; font-weight:800; font-size:14px;
+    padding:8px 14px; border-radius:999px; cursor:pointer;
+  }
+  #overlay .seg button.on { background:#8ec5ff; color:#0e1e38; }
+  #overlay .stats { display:grid; grid-template-columns:auto auto; gap:4px 18px; font-size:15px; font-variant-numeric:tabular-nums; }
+  #overlay .stats dt { color:#8fb3e8; text-align:right; }
+  #overlay .stats dd { font-weight:900; text-align:left; }
+  #overlay .big { font-size:36px; font-weight:900; color:#ffd966; font-variant-numeric:tabular-nums; }
+  #overlay .record { font-size:12px; color:#8fb3e8; min-height:1em; }
+  #overlay .main {
+    margin-top:6px;
+    background:linear-gradient(180deg,#9fd2ff,#4d8fe0);
+    color:#0b1a33; font-weight:900; font-size:17px;
+    border:none; border-radius:999px; padding:12px 34px;
+    box-shadow:0 4px 0 #22508f; cursor:pointer;
+  }
+  #overlay .main:active { transform:translateY(3px); box-shadow:0 1px 0 #22508f; }
+  .legend { display:flex; flex-direction:column; gap:3px; font-size:12px; color:#c9dcf8; }
+  .legend b { font-weight:800; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="col">
+    <div id="hud">
+      <div class="item"><span class="label">SCORE</span><span class="value" id="score">0</span></div>
+      <div class="item"><span class="label">LEVEL</span><span class="value" id="level">1</span></div>
+      <div class="item"><span class="label">타/분</span><span class="value" id="tpm">0</span></div>
+      <div class="item"><span class="label">땅</span><span id="hp"></span></div>
+      <div class="icons">
+        <button id="muteBtn" title="소리">🔊</button>
+        <button id="pauseBtn" title="일시정지 (Esc)">⏸</button>
+      </div>
+    </div>
+    <div id="wrap">
+      <canvas id="game"></canvas>
+      <div id="overlay"></div>
+    </div>
+    <form id="typing-row" autocomplete="off">
+      <input id="typing" type="text" placeholder="단어 입력 후 Enter" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="send">
+      <button type="submit">입력</button>
+    </form>
+  </div>
+</div>
+<script src="words.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
