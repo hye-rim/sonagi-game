@@ -8,7 +8,13 @@ const PER_LEVEL = 12;          // 이만큼 맞히면 다음 단계
 const FONT = '800 20px -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
 
 const fallSpeed = (lv) => 22 + lv * 7;                       // px/s. 1단계는 바닥까지 약 19초
-const spawnGap = (lv) => Math.max(0.55, 3.1 - lv * 0.2);      // 초. 1단계 약 100타/분, 8단계 약 330타/분이면 따라잡는다
+// 단계마다 '이 속도로 치면 따라잡는다'는 목표 타/분을 정하고, 그 단계에 나오는 단어의 평균 타수로
+// 나오는 간격을 거꾸로 계산한다. 1단계 95, 4단계 170, 8단계 270, 12단계 370타/분.
+const targetTpm = (lv) => 70 + lv * 25;
+const REACTION = 0.3;                                          // 단어를 보고 치기 시작할 때까지
+function spawnGap(lv, avgStrokes) {
+  return Math.max(0.5, (avgStrokes * 60) / targetTpm(lv) + REACTION);
+}
 // 단계별 단어 묶음(짧은 → 긴) 비율
 function tierWeights(lv) {
   const w3 = Math.min(0.45, Math.max(0, (lv - 4) * 0.07));
@@ -41,7 +47,7 @@ function strokes(word) {
 }
 
 if (typeof document === 'undefined') {
-  module.exports = { strokes, fallSpeed, spawnGap, tierWeights, GROUND };
+  module.exports = { strokes, fallSpeed, spawnGap, targetTpm, tierWeights, GROUND };
 } else {
 // ---------- Canvas ----------
 const canvas = document.getElementById('game');
@@ -118,6 +124,15 @@ let splashes = [], texts = [], banner = null;
 let best = Number(store.get(BEST_KEY)) || 0;
 
 const rain = Array.from({ length: 90 }, () => ({ x: Math.random() * W, y: Math.random() * H, v: 500 + Math.random() * 300, l: 8 + Math.random() * 10 }));
+
+// 지금 단계에서 나올 단어의 평균 타수 (언어·묶음 비율에 따라 다르다)
+const tierAvg = {};
+function avgStrokes(lv) {
+  if (!tierAvg[lang]) tierAvg[lang] = WORDS[lang].map((t) => t.reduce((a, w) => a + strokes(w), 0) / t.length);
+  const ws = tierWeights(lv);
+  const sum = ws.reduce((a, b) => a + b, 0);
+  return ws.reduce((a, w, i) => a + w * tierAvg[lang][i], 0) / sum;
+}
 
 function pickWord() {
   const tiers = WORDS[lang];
@@ -262,7 +277,7 @@ function update(dt) {
   if (frozen > 0) { frozen -= dt; return; }
 
   spawnIn -= dt;
-  if (spawnIn <= 0) { spawn(); spawnIn = spawnGap(level); }
+  if (spawnIn <= 0) { spawn(); spawnIn = spawnGap(level, avgStrokes(level)); }
 
   const v = fallSpeed(level);
   for (const w of words) w.y += v * dt;
