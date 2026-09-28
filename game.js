@@ -5,9 +5,14 @@ const W = 480, H = 600;
 const GROUND = H - 44;         // 단어가 여기 닿으면 땅이 깎인다
 const HP_MAX = 10;
 const PER_LEVEL = 12;          // 이만큼 맞히면 다음 단계
-const FONT = '800 20px -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+const DISPLAY = '"Jua", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+const FONT = `21px ${DISPLAY}`;
+const PAD = 13, ICON_W = 24;   // 단어 이름표 안쪽 여백, 특수 단어 아이콘 자리
 
-const fallSpeed = (lv) => 22 + lv * 7;                       // px/s. 1단계는 바닥까지 약 19초
+const START_Y = 62;            // 단어가 나타나는 높이 (구름 아래)
+// 바닥까지 걸리는 시간으로 정한다: 1단계 약 19초, 단계마다 빨라짐 (봇 테스트로 맞춘 값)
+const fallTime = (lv) => 540 / (22 + lv * 7);
+const fallSpeed = (lv) => (GROUND - START_Y) / fallTime(lv);   // px/s
 // 단계마다 '이 속도로 치면 따라잡는다'는 목표 타/분을 정하고, 그 단계에 나오는 단어의 평균 타수로
 // 나오는 간격을 거꾸로 계산한다. 1단계 95, 4단계 170, 8단계 270, 12단계 370타/분.
 const targetTpm = (lv) => 70 + lv * 25;
@@ -24,9 +29,9 @@ function tierWeights(lv) {
 
 // 특수 단어: 맞히면 효과. 아이콘은 입력하지 않아도 된다.
 const SPECIALS = {
-  freeze: { icon: '❄️', color: '#7fd3ff', name: '얼리기', desc: '3초 동안 멈춤' },
-  bomb: { icon: '💥', color: '#ff7a7a', name: '번개', desc: '화면의 단어 모두 없애기' },
-  heal: { icon: '🌱', color: '#7ee39a', name: '새싹', desc: '땅 1칸 회복' },
+  freeze: { icon: '❄️', color: '#2f8fe0', tag: '#bfe7ff', name: '얼리기', desc: '3초 동안 멈춤' },
+  bomb: { icon: '💥', color: '#e0325a', tag: '#ffc4cf', name: '번개', desc: '화면의 단어 모두 없애기' },
+  heal: { icon: '🌱', color: '#1f9e4a', tag: '#c6f7d3', name: '새싹', desc: '땅 1칸 회복' },
 };
 const SPECIAL_CHANCE = 0.08;
 const FREEZE_TIME = 3;
@@ -58,8 +63,8 @@ const $ = (id) => document.getElementById(id);
 function fit() {
   // 모바일은 키보드가 올라오면 보이는 높이가 줄어든다
   const vh = window.visualViewport ? window.visualViewport.height : innerHeight;
-  const hudH = 52, inputH = 64;
-  const scale = Math.min((innerWidth - 16) / W, (vh - 16 - hudH - inputH) / H);
+  const hudH = 58, inputH = 78;   // 위 점수판, 아래 입력칸 (테두리·그림자 포함)
+  const scale = Math.min((innerWidth - 28) / W, (vh - 28 - hudH - inputH) / H);
   const cssW = Math.floor(W * scale), cssH = Math.floor(H * scale);
   const dpr = window.devicePixelRatio || 1;
   canvas.style.width = cssW + 'px';
@@ -67,7 +72,7 @@ function fit() {
   canvas.width = Math.round(cssW * dpr);
   canvas.height = Math.round(cssH * dpr);
   ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
-  $('col').style.width = Math.max(cssW, 300) + 'px';
+  $('col').style.width = Math.min(innerWidth - 16, Math.max(cssW, 300)) + 'px';
 }
 addEventListener('resize', fit);
 if (window.visualViewport) visualViewport.addEventListener('resize', fit);
@@ -153,14 +158,14 @@ function spawn() {
   const special = level >= 2 && Math.random() < SPECIAL_CHANCE
     ? ['freeze', 'bomb', 'heal'][Math.floor(Math.random() * 3)] : null;
   ctx.font = FONT;
-  const w = ctx.measureText(text).width + (special ? 26 : 0);
+  const w = ctx.measureText(text).width + PAD * 2 + (special ? ICON_W : 0);
   // 막 나온 단어들과 겹치지 않는 자리를 몇 번 찾아본다
   let x = 0;
   for (let k = 0; k < 8; k++) {
-    x = 12 + Math.random() * (W - 24 - w);
-    if (!words.some((o) => o.y < 70 && x < o.x + o.w + 10 && o.x < x + w + 10)) break;
+    x = 10 + Math.random() * (W - 20 - w);
+    if (!words.some((o) => o.y < 110 && x < o.x + o.w + 10 && o.x < x + w + 10)) break;
   }
-  words.push({ text, x, y: 16, w, special });   // 먹구름 아래에서 전부 보이게 시작
+  words.push({ text, x, y: START_Y, w, special });
 }
 
 function startGame() {
@@ -307,9 +312,9 @@ function gameOver() {
   input.blur();
   setTimeout(() => {
     showOverlay(`
-      <h2>땅이 다 잠겼어요</h2>
-      <div class="big">${score.toLocaleString()}</div>
-      <span class="record">${score >= best && score > 0 ? '🏆 최고 점수!' : `최고 점수 ${best.toLocaleString()}`}</span>
+      <h2 class="inked">땅이 다 잠겼어요</h2>
+      <div class="big inked">${score.toLocaleString()}</div>
+      <span class="tag">${score >= best && score > 0 ? '🏆 최고 점수!' : `최고 점수 ${best.toLocaleString()}`}</span>
       <dl class="stats">
         <dt>단계</dt><dd>${level}</dd>
         <dt>맞힌 단어</dt><dd>${cleared}개</dd>
@@ -318,103 +323,172 @@ function gameOver() {
         <dt>최대 콤보</dt><dd>${maxCombo}</dd>
       </dl>
       <button class="main" data-act="start">다시 하기</button>
-      <button class="main" data-act="menu" style="background:rgba(255,255,255,.12);color:#c9dcf8;box-shadow:none">처음으로</button>`);
+      <button class="sub" data-act="menu">← 처음으로</button>`);
   }, 600);
 }
 
 // ---------- Draw ----------
+// 스티커 느낌: 진한 남보라 테두리 + 아래로 떨어진 그림자
+const INK = '#2b1d52';
+function roundRect(x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+function label(text, x, y, size, fill = '#fff', align = 'center') {
+  ctx.font = `${size}px ${DISPLAY}`;
+  ctx.textAlign = align;
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = Math.max(3, size * 0.2);
+  ctx.strokeStyle = INK;
+  ctx.strokeText(text, x, y);
+  ctx.fillStyle = fill;
+  ctx.fillText(text, x, y);
+}
+
+// 뭉게구름: 동그라미 몇 개를 겹쳐 테두리까지
+function cloud(cx, cy, s) {
+  const bumps = [[-1.1, 0.25, 0.55], [-0.45, -0.15, 0.75], [0.35, -0.05, 0.7], [1.0, 0.3, 0.5]];
+  for (const pass of [0, 1, 2]) {
+    for (const [bx, by, br] of bumps) {
+      ctx.beginPath();
+      ctx.arc(cx + bx * s, cy + by * s + (pass === 0 ? 5 : 0), br * s + (pass === 1 ? 3 : 0), 0, Math.PI * 2);
+      ctx.fillStyle = pass === 0 ? INK : pass === 1 ? INK : '#eef0ff';
+      ctx.fill();
+    }
+  }
+}
+
 function draw() {
+  const now = performance.now() / 1000;
   const sky = ctx.createLinearGradient(0, 0, 0, H);
-  sky.addColorStop(0, '#26395c');
-  sky.addColorStop(1, '#3d5d8a');
+  sky.addColorStop(0, frozen > 0 ? '#7fd3ff' : '#4f8cff');
+  sky.addColorStop(1, frozen > 0 ? '#b3e6ff' : '#8a6cff');
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, W, H);
-
-  // 먹구름
-  ctx.fillStyle = 'rgba(20,30,50,.55)';
-  for (let k = 0; k < 7; k++) {
-    ctx.beginPath();
-    ctx.ellipse(k * 80 - 10, 6 + (k % 2) * 8, 70, 30, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  ctx.save();
+  ctx.translate(W / 2, H / 2);
+  ctx.rotate(-Math.PI / 6);
+  ctx.fillStyle = 'rgba(255,255,255,.06)';
+  for (let x = -H; x < H; x += 56) ctx.fillRect(x, -H, 26, H * 2);
+  ctx.restore();
 
   // 빗줄기
-  ctx.strokeStyle = 'rgba(190,220,255,.28)';
-  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = 'rgba(255,255,255,.35)';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
   ctx.beginPath();
   for (const d of rain) { ctx.moveTo(d.x, d.y); ctx.lineTo(d.x + d.l * 0.12, d.y - d.l); }
   ctx.stroke();
+  ctx.lineCap = 'butt';
 
-  // 땅: 남은 칸만큼 초록, 잠긴 칸은 물
-  const cw = W / HP_MAX;
-  for (let i = 0; i < HP_MAX; i++) {
-    const alive = i < hp;
-    ctx.fillStyle = alive ? '#4f8a3c' : '#2c5f9e';
-    ctx.fillRect(i * cw, GROUND + 6, cw, H - GROUND - 6);
-    ctx.fillStyle = alive ? '#6fbf4f' : '#4d8fe0';
-    ctx.fillRect(i * cw, GROUND + 6, cw, 6);
-    if (i) { ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.fillRect(i * cw - 1, GROUND + 6, 2, H - GROUND - 6); }
+  // 구름: 천천히 흘러간다
+  for (let k = 0; k < 4; k++) {
+    const x = ((k * 150 + now * (6 + k * 2)) % (W + 160)) - 80;
+    cloud(x, 10 + (k % 2) * 10, 30 + (k % 3) * 4);
   }
 
-  // 단어
-  ctx.font = FONT;
-  ctx.textBaseline = 'middle';
-  ctx.textAlign = 'left';
+  // 땅: 남은 칸은 풀밭, 잠긴 칸은 물 (한 칸씩 테두리 두른 타일)
+  const cw = (W - 8) / HP_MAX;
+  for (let i = 0; i < HP_MAX; i++) {
+    const x = 4 + i * cw, y = GROUND + 8, h = H - y + 10;
+    const alive = i < hp;
+    ctx.fillStyle = INK;
+    roundRect(x + 1, y + 4, cw - 2, h, 8); ctx.fill();
+    const g = ctx.createLinearGradient(0, y, 0, y + h);
+    if (alive) { g.addColorStop(0, '#7df08f'); g.addColorStop(1, '#2fb35a'); }
+    else { g.addColorStop(0, '#7cc4ff'); g.addColorStop(1, '#2f6fe0'); }
+    ctx.fillStyle = g;
+    roundRect(x + 1, y, cw - 2, h, 8); ctx.fill();
+    ctx.lineWidth = 2.5; ctx.strokeStyle = INK; ctx.stroke();
+    if (alive) {
+      // 풀잎
+      ctx.fillStyle = '#b8ffc2';
+      for (let b = 0; b < 3; b++) {
+        const bx = x + 8 + b * (cw - 16) / 2;
+        ctx.beginPath(); ctx.moveTo(bx - 3, y + 12); ctx.lineTo(bx, y + 4); ctx.lineTo(bx + 3, y + 12); ctx.fill();
+      }
+    } else {
+      // 물결
+      ctx.strokeStyle = 'rgba(255,255,255,.7)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let s = 0; s <= cw - 12; s += 2) {
+        const yy = y + 12 + Math.sin(now * 4 + (x + s) / 6) * 2;
+        s ? ctx.lineTo(x + 6 + s, yy) : ctx.moveTo(x + 6, yy);
+      }
+      ctx.stroke();
+    }
+  }
+
+  // 단어: 테두리 두른 이름표. 치는 중인 앞부분은 분홍으로, 그 단어는 노란 테두리 빛
   const cur = input.value.trim();
   for (const w of words) {
-    let x = w.x;
-    if (w.special) {
-      ctx.font = '18px sans-serif';
-      ctx.fillText(SPECIALS[w.special].icon, x, w.y);
-      ctx.font = FONT;
-      x += 26;
+    const sp = w.special ? SPECIALS[w.special] : null;
+    const hot = cur && w.text.startsWith(cur);
+    const h = 36, y = w.y - h / 2;
+    if (hot) { ctx.fillStyle = 'rgba(255,230,80,.8)'; roundRect(w.x - 5, y - 5, w.w + 10, h + 10, 22); ctx.fill(); }
+    ctx.fillStyle = INK;
+    roundRect(w.x, y + 4, w.w, h, 18); ctx.fill();
+    ctx.fillStyle = sp ? sp.tag : '#ffffff';
+    roundRect(w.x, y, w.w, h, 18); ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
+    let tx = w.x + PAD;
+    if (sp) {
+      ctx.font = '18px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(sp.icon, tx - 2, w.y + 1);
+      tx += ICON_W;
     }
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = 'rgba(8,16,32,.85)';
-    ctx.strokeText(w.text, x, w.y);
-    ctx.fillStyle = w.special ? SPECIALS[w.special].color : '#ffffff';
-    ctx.fillText(w.text, x, w.y);
-    // 지금 치고 있는 글자와 앞부분이 같으면 노랗게
-    if (cur && w.text.startsWith(cur)) {
-      ctx.fillStyle = '#ffd966';
-      ctx.fillText(cur, x, w.y);
-    }
+    ctx.font = FONT;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = INK;
+    ctx.fillText(w.text, tx, w.y + 1);
+    if (hot) { ctx.fillStyle = '#ff3d8b'; ctx.fillText(cur, tx, w.y + 1); }
   }
 
-  // 얼음 효과
   if (frozen > 0) {
-    ctx.fillStyle = `rgba(160,220,255,${0.12 + 0.06 * Math.sin(performance.now() / 120)})`;
-    ctx.fillRect(0, 0, W, GROUND);
+    for (let k = 0; k < 6; k++) {
+      ctx.globalAlpha = 0.5 + 0.3 * Math.sin(now * 3 + k);
+      ctx.font = '26px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('❄️', 40 + k * 80, 80 + (k % 2) * 40 + Math.sin(now * 2 + k) * 6);
+    }
+    ctx.globalAlpha = 1;
   }
 
   for (const s of splashes) {
     ctx.globalAlpha = Math.min(1, s.life * 2);
+    ctx.fillStyle = INK;
+    ctx.beginPath(); ctx.arc(s.x, s.y + 1.5, 4, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = s.color;
-    ctx.beginPath(); ctx.arc(s.x, s.y, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(s.x, s.y, 3.5, 0, Math.PI * 2); ctx.fill();
   }
   ctx.globalAlpha = 1;
 
-  ctx.textAlign = 'center';
   for (const t of texts) {
     ctx.globalAlpha = Math.min(1, (0.9 - t.t) * 3);
-    ctx.font = '900 15px sans-serif';
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = 'rgba(8,16,32,.9)';
-    ctx.strokeText(t.text, t.x, t.y - 16);
-    ctx.fillStyle = '#ffd966';
-    ctx.fillText(t.text, t.x, t.y - 16);
+    label(t.text, t.x, t.y - 30, 18, '#fff54f');
   }
   ctx.globalAlpha = 1;
 
   if (banner && state === 'play') {
     const a = Math.min(1, (1.4 - banner.t) * 2.5);
+    const s = 1 + Math.max(0, 0.2 - banner.t);
     ctx.globalAlpha = a;
-    ctx.font = '900 38px sans-serif';
-    ctx.lineWidth = 7;
-    ctx.strokeStyle = '#0b1a33';
-    ctx.strokeText(banner.text, W / 2, H * 0.42);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(banner.text, W / 2, H * 0.42);
+    ctx.save();
+    ctx.translate(W / 2, H * 0.42);
+    ctx.scale(s, s);
+    label(banner.text, 0, 0, 40, '#fff54f');
+    ctx.restore();
     ctx.globalAlpha = 1;
   }
 }
@@ -423,7 +497,6 @@ function updateHud() {
   $('score').textContent = score.toLocaleString();
   $('level').textContent = level;
   $('tpm').textContent = tpm();
-  $('hp').innerHTML = `<span style="color:#7ee39a">${'■'.repeat(hp)}</span><span style="color:#2c5f9e">${'■'.repeat(HP_MAX - hp)}</span>`;
 }
 
 // ---------- Loop ----------
@@ -457,8 +530,9 @@ function showMenu() {
   words = [];
   const t = loadTpm();
   showOverlay(`
-    <h1>소나기</h1>
-    <p>하늘에서 떨어지는 단어를 <b>바닥에 닿기 전에</b> 입력하세요!<br>단어가 바닥에 닿을 때마다 땅이 한 칸씩 잠겨요.</p>
+    <h1 class="inked"><span class="drop">🌧️</span> 소나기</h1>
+    <span class="tag">떨어지는 단어를 땅에 닿기 전에!</span>
+    <p>단어가 땅에 닿을 때마다 풀밭이 한 칸씩 잠겨요</p>
     <div class="group">
       <span class="label">언어</span>
       ${segHtml('lang', [['ko', '한글'], ['en', 'English']], lang)}
@@ -468,9 +542,9 @@ function showMenu() {
       ${segHtml('start', [[1, '1단계'], [4, '4단계'], [8, '8단계']], startLevel)}
     </div>
     <div class="legend">
-      ${Object.values(SPECIALS).map((s) => `<div><b style="color:${s.color}">${s.icon} ${s.name}</b> ${s.desc}</div>`).join('')}
+      ${Object.values(SPECIALS).map((s) => `<div>${s.icon} <b style="color:${s.color}">${s.name}</b> ${s.desc}</div>`).join('')}
     </div>
-    <span class="record">${best ? `최고 점수 ${best.toLocaleString()}` : ''}${t[lang] ? ` · 최고 ${t[lang]}타/분` : ''}</span>
+    ${best || t[lang] ? `<span class="tag" style="background:#ffd23f;color:#2b1d52">🏆 ${best ? `${best.toLocaleString()}점` : ''}${best && t[lang] ? ' · ' : ''}${t[lang] ? `${t[lang]}타/분` : ''}</span>` : ''}
     <button class="main" data-act="start">시작하기</button>
     <div class="help">입력하고 Enter · Esc 일시정지</div>`);
 }
@@ -478,9 +552,9 @@ function showMenu() {
 function pause() {
   if (state !== 'play') return;
   state = 'paused';
-  showOverlay(`<h2>일시정지</h2><p>점수 ${score.toLocaleString()} · ${level}단계</p>
+  showOverlay(`<h2 class="inked">일시정지</h2><span class="tag">점수 ${score.toLocaleString()} · ${level}단계</span>
     <button class="main" data-act="resume">계속하기</button>
-    <button class="main" data-act="menu" style="background:rgba(255,255,255,.12);color:#c9dcf8;box-shadow:none">처음으로</button>`);
+    <button class="sub" data-act="menu">← 처음으로</button>`);
 }
 function resume() {
   if (state !== 'paused') return;
@@ -550,6 +624,7 @@ $('muteBtn').onclick = (e) => { e.currentTarget.blur(); toggleMute(); input.focu
 $('pauseBtn').onclick = (e) => { e.currentTarget.blur(); state === 'paused' ? resume() : pause(); };
 $('muteBtn').textContent = muted ? '🔇' : '🔊';
 
+if (document.fonts) document.fonts.load(FONT).catch(() => {});
 showMenu();
 updateHud();
 fit();
