@@ -546,7 +546,7 @@ function showMenu() {
       ${Object.values(SPECIALS).map((s) => `<div>${s.icon} <b style="color:${s.color}">${s.name}</b> ${s.desc}</div>`).join('')}
     </div>
     ${best || t[lang] ? `<span class="tag" style="background:#ffd23f;color:#2b1d52">🏆 ${best ? `${best.toLocaleString()}점` : ''}${best && t[lang] ? ' · ' : ''}${t[lang] ? `${t[lang]}타/분` : ''}</span>` : ''}
-    <div class="help">입력하고 Enter · Esc 일시정지</div>`);
+    <div class="help"><span class="pc">입력하고 Enter · Esc 일시정지</span><span class="touch">입력하고 키보드의 완료(↵)·입력 버튼</span></div>`);
 }
 
 function pause() {

@@ -146,6 +146,9 @@
   #overlay .main:active { transform:translateY(4px); box-shadow:0 2px 0 var(--ink); }
   #overlay .sub { background:none; border:none; color:#fff; font-size:17px; cursor:pointer; padding:6px; font-family:inherit; opacity:.9; }
   #overlay .help { font-size:13px; color:#fff; opacity:.8; }
+  /* 기기에 맞는 설명만: 폰(손가락)은 .touch, PC(마우스·키보드)는 .pc */
+  .pc { display:none; }
+  @media (pointer:fine) { .pc { display:inline; } .touch { display:none; } }
 </style>
 </head>
 <body>
