@@ -66,7 +66,7 @@ function fit() {
   const hudH = 58, inputH = 78;   // 위 점수판, 아래 입력칸 (테두리·그림자 포함)
   const scale = Math.min((innerWidth - 28) / W, (vh - 28 - hudH - inputH) / H);
   const cssW = Math.floor(W * scale), cssH = Math.floor(H * scale);
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
   canvas.style.width = cssW + 'px';
   canvas.style.height = cssH + 'px';
   canvas.width = Math.round(cssW * dpr);
