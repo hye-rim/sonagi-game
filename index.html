@@ -81,6 +81,18 @@
   }
   #typing-row button:active { transform:translateY(4px); box-shadow:0 1px 0 var(--ink); }
 
+  /* 키보드가 올라온 동안(.kb): 점수판·입력칸을 줄여서 판이 더 크게 보이게 */
+  .kb #stage { width:100%; padding:4px 8px; justify-content:flex-start; }
+  .kb #hud { padding-bottom:6px; gap:5px; }
+  .kb .pill { padding:1px 10px; box-shadow:0 3px 0 var(--ink); border-width:2.5px; }
+  .kb .pill .label { display:none; }
+  .kb .pill .value { font-size:17px; }
+  .kb #hud button { width:32px; height:32px; font-size:14px; box-shadow:0 3px 0 var(--ink); border-width:2.5px; }
+  .kb #typing-row { padding-top:10px; gap:6px; }
+  .kb #typing { font-size:19px; padding:6px 10px; border-radius:14px; }
+  .kb #typing-row button { font-size:16px; padding:0 14px; border-radius:14px; box-shadow:0 4px 0 var(--ink); }
+  .kb #game { box-shadow:0 0 0 3px var(--ink), 0 5px 0 3px var(--ink); border-radius:16px; }
+
   /* 메뉴·결과 화면 */
   #overlay {
     position:absolute; inset:0;

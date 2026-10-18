@@ -1,8 +1,10 @@
 'use strict';
 
 // ---------- Rules ----------
-const W = 480, H = 600;
-const GROUND = H - 44;         // 단어가 여기 닿으면 땅이 깎인다
+const W = 480;
+const H_FULL = 600, H_MIN = 420;   // 판 높이: 보통은 600. 폰 키보드가 올라오면 보이는 높이에 맞춰 H_MIN 까지 줄어든다
+let H = H_FULL;
+let GROUND = H - 44;           // 단어가 여기 닿으면 땅이 깎인다
 const HP_MAX = 10;
 const PER_LEVEL = 12;          // 이만큼 맞히면 다음 단계
 const DISPLAY = '"Jua", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
@@ -60,11 +62,34 @@ const ctx = canvas.getContext('2d');
 const input = document.getElementById('typing');
 const $ = (id) => document.getElementById(id);
 
-function fit() {
-  // 모바일은 키보드가 올라오면 보이는 높이가 줄어든다
-  const vh = window.visualViewport ? window.visualViewport.height : innerHeight;
-  const hudH = 58, inputH = 78;   // 위 점수판, 아래 입력칸 (테두리·그림자 포함)
-  const scale = Math.min((innerWidth - 28) / W, (vh - 28 - hudH - inputH) / H);
+// 판 높이를 바꾼다. 떨어지는 단어는 땅까지 남은 비율을 그대로 유지해서, 바뀌는 순간에 갑자기 땅에 닿지 않는다
+// (바닥까지 걸리는 시간은 fallTime 으로 정해져 있어서 난이도는 그대로다)
+function setBoardHeight(h) {
+  if (h === H) return;
+  const oldG = GROUND;
+  H = h; GROUND = H - 44;
+  for (const w of words) w.y = w.y <= START_Y ? w.y : START_Y + (w.y - START_Y) * (GROUND - START_Y) / (oldG - START_Y);
+}
+
+function fit(forceH, forceTop) {                // 인자는 시험에서만 쓴다 (키보드가 올라온 높이를 흉내)
+  // 폰은 키보드가 올라오면 '보이는 영역'(visualViewport)만 줄고 페이지는 그대로다. 사파리는 입력칸이 보이게 페이지를 위로
+  // 밀어 올려서 위쪽 점수판과 판이 잘렸다. 그래서 키보드가 올라온 동안은 앱을 보이는 영역에 붙이고(.kb),
+  // 판을 위아래로만 줄여서(가로는 꽉 채워서) 글자가 작아지지 않게 한다.
+  const vv = window.visualViewport;
+  const vh = typeof forceH === 'number' ? forceH : vv ? vv.height : innerHeight;
+  const kb = innerHeight - vh > 120;
+  document.documentElement.classList.toggle('kb', kb);
+  const st = $('stage');
+  if (kb) Object.assign(st.style, { position: 'fixed', left: '0', top: (typeof forceTop === 'number' ? forceTop : vv ? vv.offsetTop : 0) + 'px', height: vh + 'px' });
+  else Object.assign(st.style, { position: '', left: '', top: '', height: '' });
+
+  const hudH = kb ? 42 : 58, inputH = kb ? 60 : 78, gap = kb ? 14 : 28;   // 위 점수판, 아래 입력칸 (테두리·그림자 포함)
+  const availW = innerWidth - gap, availH = vh - gap - hudH - inputH;
+  let scale = Math.min(availW / W, availH / H_FULL);
+  if (kb) {
+    scale = Math.min(availW / W, availH / H_MIN);
+    setBoardHeight(Math.max(H_MIN, Math.min(H_FULL, Math.floor(availH / scale))));
+  } else setBoardHeight(H_FULL);
   const cssW = Math.floor(W * scale), cssH = Math.floor(H * scale);
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   canvas.style.width = cssW + 'px';
@@ -74,8 +99,9 @@ function fit() {
   ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
   $('col').style.width = Math.min(innerWidth - 16, Math.max(cssW, 300)) + 'px';
 }
-addEventListener('resize', fit);
-if (window.visualViewport) visualViewport.addEventListener('resize', fit);
+addEventListener('resize', () => fit());
+if (window.visualViewport) { visualViewport.addEventListener('resize', () => fit()); visualViewport.addEventListener('scroll', () => fit()); }
+window.__kbFit = fit;
 
 // ---------- Storage ----------
 const store = {
