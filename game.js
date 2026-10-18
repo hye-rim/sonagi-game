@@ -71,13 +71,23 @@ function setBoardHeight(h) {
   for (const w of words) w.y = w.y <= START_Y ? w.y : START_Y + (w.y - START_Y) * (GROUND - START_Y) / (oldG - START_Y);
 }
 
+// 키보드가 열리기 전의 화면 높이를 기억해 둔다. iOS 에 따라 키보드가 올라올 때 '보이는 영역'만 줄기도 하고 페이지 높이(innerHeight)까지
+// 같이 줄기도 해서, 둘 중 어느 쪽이든 키보드를 알아보도록 '입력칸을 누르기 전의 높이'와 비교한다.
+// 입력칸에 포커스가 없을 때(또는 화면을 돌렸을 때)는 지금 높이로 갱신한다.
+let baseH = Math.max(innerHeight, window.visualViewport ? window.visualViewport.height : 0), baseW = innerWidth;
+function keyboardUp(vh) {
+  if (innerWidth !== baseW) { baseW = innerWidth; baseH = Math.max(innerHeight, vh); }
+  else if (document.activeElement !== input) baseH = Math.max(innerHeight, vh);
+  return baseH - vh > 120;
+}
+
 function fit(forceH, forceTop) {                // 인자는 시험에서만 쓴다 (키보드가 올라온 높이를 흉내)
   // 폰은 키보드가 올라오면 '보이는 영역'(visualViewport)만 줄고 페이지는 그대로다. 사파리는 입력칸이 보이게 페이지를 위로
   // 밀어 올려서 위쪽 점수판과 판이 잘렸다. 그래서 키보드가 올라온 동안은 앱을 보이는 영역에 붙이고(.kb),
   // 판을 위아래로만 줄여서(가로는 꽉 채워서) 글자가 작아지지 않게 한다.
   const vv = window.visualViewport;
   const vh = typeof forceH === 'number' ? forceH : vv ? vv.height : innerHeight;
-  const kb = innerHeight - vh > 120;
+  const kb = keyboardUp(vh);
   document.documentElement.classList.toggle('kb', kb);
   const st = $('stage');
   if (kb) Object.assign(st.style, { position: 'fixed', left: '0', top: (typeof forceTop === 'number' ? forceTop : vv ? vv.offsetTop : 0) + 'px', height: vh + 'px' });
