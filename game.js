@@ -1,61 +1,16 @@
 'use strict';
 
-// ---------- Rules ----------
+// 소나기: 화면·입력·소리·진행. 규칙(타수·낙하 속도·간격·단어 고르기·점수·단계)은 logic.js (LOGIC_SONAGI) 에 있다.
+const L = LOGIC_SONAGI;
+const { HP_MAX, START_Y, SPECIALS, FREEZE_TIME, strokes, spawnGap, levelFor: levelAt } = L;
 const W = 480;
 const H_FULL = 600, H_MIN = 420;   // 판 높이: 보통은 600. 폰 키보드가 올라오면 보이는 높이에 맞춰 H_MIN 까지 줄어든다
 let H = H_FULL;
 let GROUND = H - 44;           // 단어가 여기 닿으면 땅이 깎인다
-const HP_MAX = 10;
-const PER_LEVEL = 12;          // 이만큼 맞히면 다음 단계
 const DISPLAY = '"Jua", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
 const FONT = `21px ${DISPLAY}`;
 const PAD = 13, ICON_W = 24;   // 단어 이름표 안쪽 여백, 특수 단어 아이콘 자리
 
-const START_Y = 62;            // 단어가 나타나는 높이 (구름 아래)
-// 바닥까지 걸리는 시간으로 정한다: 1단계 약 19초, 단계마다 빨라짐 (봇 테스트로 맞춘 값)
-const fallTime = (lv) => 540 / (22 + lv * 7);
-const fallSpeed = (lv) => (GROUND - START_Y) / fallTime(lv);   // px/s
-// 단계마다 '이 속도로 치면 따라잡는다'는 목표 타/분을 정하고, 그 단계에 나오는 단어의 평균 타수로
-// 나오는 간격을 거꾸로 계산한다. 1단계 95, 4단계 170, 8단계 270, 12단계 370타/분.
-const targetTpm = (lv) => 70 + lv * 25;
-const REACTION = 0.3;                                          // 단어를 보고 치기 시작할 때까지
-function spawnGap(lv, avgStrokes) {
-  return Math.max(0.5, (avgStrokes * 60) / targetTpm(lv) + REACTION);
-}
-// 단계별 단어 묶음(짧은 → 긴) 비율
-function tierWeights(lv) {
-  const w3 = Math.min(0.45, Math.max(0, (lv - 4) * 0.07));
-  const w2 = Math.min(0.6, (lv - 1) * 0.1);
-  return [Math.max(0.15, 1 - w2 - w3), w2, w3];
-}
-
-// 특수 단어: 맞히면 효과. 아이콘은 입력하지 않아도 된다.
-const SPECIALS = {
-  freeze: { icon: '❄️', color: '#2f8fe0', tag: '#bfe7ff', name: '얼리기', desc: '3초 동안 멈춤' },
-  bomb: { icon: '💥', color: '#e0325a', tag: '#ffc4cf', name: '번개', desc: '화면의 단어 모두 없애기' },
-  heal: { icon: '🌱', color: '#1f9e4a', tag: '#c6f7d3', name: '새싹', desc: '땅 1칸 회복' },
-};
-const SPECIAL_CHANCE = 0.08;
-const FREEZE_TIME = 3;
-
-// 타수: 한글은 자모를 친 횟수로 센다 (겹모음·겹받침은 두 번, 쌍자음은 한 번)
-const DOUBLE_VOWEL = new Set([9, 10, 11, 14, 15, 16, 19]);          // ㅘ ㅙ ㅚ ㅝ ㅞ ㅟ ㅢ
-const DOUBLE_FINAL = new Set([3, 5, 6, 9, 10, 11, 12, 13, 14, 15, 18]); // ㄳ ㄵ ㄶ ㄺ ㄻ ㄼ ㄽ ㄾ ㄿ ㅀ ㅄ
-function strokes(word) {
-  let n = 0;
-  for (const ch of word) {
-    const c = ch.charCodeAt(0) - 0xac00;
-    if (c < 0 || c > 11171) { n++; continue; }
-    const vowel = ((c / 28) | 0) % 21, final = c % 28;
-    n += 1 + (DOUBLE_VOWEL.has(vowel) ? 2 : 1);
-    if (final) n += DOUBLE_FINAL.has(final) ? 2 : 1;
-  }
-  return n;
-}
-
-if (typeof document === 'undefined') {
-  module.exports = { strokes, fallSpeed, spawnGap, targetTpm, tierWeights, GROUND };
-} else {
 // ---------- Canvas ----------
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -167,32 +122,18 @@ let best = Number(store.get(BEST_KEY)) || 0;
 const rain = Array.from({ length: 90 }, () => ({ x: Math.random() * W, y: Math.random() * H, v: 500 + Math.random() * 300, l: 8 + Math.random() * 10 }));
 
 // 지금 단계에서 나올 단어의 평균 타수 (언어·묶음 비율에 따라 다르다)
-const tierAvg = {};
+const avgCache = {};
 function avgStrokes(lv) {
-  if (!tierAvg[lang]) tierAvg[lang] = WORDS[lang].map((t) => t.reduce((a, w) => a + strokes(w), 0) / t.length);
-  const ws = tierWeights(lv);
-  const sum = ws.reduce((a, b) => a + b, 0);
-  return ws.reduce((a, w, i) => a + w * tierAvg[lang][i], 0) / sum;
+  const k = lang + ':' + lv;
+  if (!(k in avgCache)) avgCache[k] = L.avgStrokes(WORDS[lang], lv);
+  return avgCache[k];
 }
 
-function pickWord() {
-  const tiers = WORDS[lang];
-  const ws = tierWeights(level);
-  let r = Math.random() * ws.reduce((a, b) => a + b, 0), tier = 0;
-  while (tier < ws.length - 1 && (r -= ws[tier]) > 0) tier++;
-  const pool = tiers[tier];
-  // 화면에 이미 떠 있는 단어는 피한다 (같은 단어 두 개면 헷갈린다)
-  for (let k = 0; k < 10; k++) {
-    const w = pool[Math.floor(Math.random() * pool.length)];
-    if (!words.some((x) => x.text === w)) return w;
-  }
-  return pool[Math.floor(Math.random() * pool.length)];
-}
+const pickWord = () => L.pickWord(WORDS[lang], level, words.map((w) => w.text));
 
 function spawn() {
   const text = pickWord();
-  const special = level >= 2 && Math.random() < SPECIAL_CHANCE
-    ? ['freeze', 'bomb', 'heal'][Math.floor(Math.random() * 3)] : null;
+  const special = L.pickSpecial(level);
   ctx.font = FONT;
   const w = ctx.measureText(text).width + PAD * 2 + (special ? ICON_W : 0);
   // 막 나온 단어들과 겹치지 않는 자리를 몇 번 찾아본다
@@ -224,14 +165,13 @@ function startGame() {
   input.focus();
 }
 
-function levelFor(n) { return startLevel + Math.floor(n / PER_LEVEL); }
+function levelFor(n) { return levelAt(startLevel, n); }
 
 function submit(raw) {
   const v = raw.trim();
   if (!v || state !== 'play') return;
   // 같은 단어가 여럿이면 땅에 가장 가까운 것부터
-  let hit = null;
-  for (const w of words) if (w.text === v && (!hit || w.y > hit.y)) hit = w;
+  const hit = L.findHit(words, v);
   if (!hit) {
     wrongs++;
     combo = 0;
@@ -244,9 +184,8 @@ function submit(raw) {
   cleared++;
   combo++;
   maxCombo = Math.max(maxCombo, combo);
-  const st = strokes(hit.text);
-  typed += st;
-  const gain = st * (5 + level) + (combo >= 5 ? Math.floor(combo / 5) * 10 : 0);
+  typed += strokes(hit.text);
+  const gain = L.scoreFor(hit.text, level, combo);
   addScore(gain);
   texts.push({ text: `+${gain}${combo >= 5 ? ` · ${combo}콤보` : ''}`, x: hit.x + hit.w / 2, y: hit.y, t: 0 });
   pop(hit.x + hit.w / 2, hit.y, hit.special ? SPECIALS[hit.special].color : '#bfe3ff', 14);
@@ -259,7 +198,7 @@ function submit(raw) {
     sfx.bomb();
     banner = { text: '💥 번개!', t: 0 };
     for (const w of words) {
-      const g = strokes(w.text) * (5 + level);
+      const g = L.bombScoreFor(w.text, level);
       addScore(g);
       pop(w.x + w.w / 2, w.y, '#ffe27a', 8);
       cleared++;
@@ -320,7 +259,7 @@ function update(dt) {
   spawnIn -= dt;
   if (spawnIn <= 0) { spawn(); spawnIn = spawnGap(level, avgStrokes(level)); }
 
-  const v = fallSpeed(level);
+  const v = L.fallSpeed(level, GROUND);
   for (const w of words) w.y += v * dt;
   const landed = words.filter((w) => w.y >= GROUND);
   if (landed.length) {
@@ -665,4 +604,3 @@ showMenu();
 updateHud();
 fit();
 requestAnimationFrame(frame);
-}
